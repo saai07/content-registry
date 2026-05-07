@@ -9,3 +9,4 @@ pillow>=10.0.0
 pix2text
 # Pin transformers: pix2text's optimum-onnx backend breaks on >=4.58.0
 transformers>=4.35.0,<4.58.0
+PyMuPDF>=1.24.0

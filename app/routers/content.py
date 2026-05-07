@@ -2,12 +2,13 @@
 
 import json
 import os
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from app.config import ALLOWED_EXTENSIONS, MAX_FILE_SIZE, UPLOADS_DIR
 from app.database import (
@@ -29,9 +30,27 @@ from app.models import (
 
 router = APIRouter(prefix="/api/content", tags=["Content"])
 
+# ---------------------------------------------------------------------------
+# Extraction progress tracking (in-memory, single-worker safe)
+# ---------------------------------------------------------------------------
+_progress_lock = threading.Lock()
+_progress: dict[str, dict] = {}
+
+
+def _update_progress(content_id: str, percent: int, message: str):
+    """Thread-safe update of extraction progress."""
+    status = "completed" if percent >= 100 else ("failed" if percent < 0 else "processing")
+    with _progress_lock:
+        _progress[content_id] = {
+            "percent": max(percent, 0),
+            "message": message,
+            "status": status,
+        }
+
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_content(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="The file to upload"),
     class_name: str = Form(..., description="Class (e.g., 'Class 10')"),
     subject: str = Form(..., description="Subject (e.g., 'Mathematics')"),
@@ -39,7 +58,12 @@ async def upload_content(
     description: str = Form("", description="Optional description or notes"),
     tags: str = Form("[]", description="JSON array of tags, e.g. '[\"important\", \"revision\"]'"),
 ):
-    """Upload a content file with classification metadata."""
+    """Upload a content file with classification metadata.
+
+    Extraction (full mode) is automatically triggered in the background
+    for supported file types (images, PDFs). Poll GET /api/content/{id}
+    to check when extracted_text is populated.
+    """
 
     # Validate file extension
     ext = Path(file.filename).suffix.lower()
@@ -102,59 +126,138 @@ async def upload_content(
 
     record = insert_content(data)
 
+    # Auto-trigger full extraction in background for extractable files
+    if can_extract(str(filepath)):
+        background_tasks.add_task(
+            _run_extraction_background, content_id, str(filepath), "full"
+        )
+
     return UploadResponse(content=ContentResponse(**record))
 
 
-@router.post("/extract/quick", response_model=ExtractionResponse)
-async def quick_extract(
-    file: UploadFile = File(..., description="Image or PDF to extract text from"),
+@router.post("/upload-extract", tags=["Upload + Extract"])
+async def upload_and_extract(
+    file: UploadFile = File(..., description="The file to upload"),
+    class_name: str = Form(..., description="Class (e.g., 'Class 10')"),
+    subject: str = Form(..., description="Subject (e.g., 'Mathematics')"),
+    chapter: str = Form(..., description="Chapter (e.g., 'Chapter 1: Real Numbers')"),
+    description: str = Form("", description="Optional description or notes"),
+    tags: str = Form("[]", description="JSON array of tags"),
 ):
-    """Quick extraction — upload a file and get extracted text without storing.
+    """Upload a file AND extract text in one call with live progress.
 
-    Useful for testing pix2text or one-off extractions.
-    The file is temporarily saved, processed, then deleted.
+    Returns a **Server-Sent Events (SSE)** stream. Each event is JSON:
+
+    ```
+    data: {"percent": 42, "message": "Extracting page 3/7...", "status": "processing"}
+    data: {"percent": 100, "message": "Done", "status": "completed", "content_id": "...", "extracted_text": "..."}
+    ```
+
+    The final event (percent=100) includes the full `extracted_text` and `content_id`.
     """
+    import queue
+    import threading
+
+    # ── Validate ──────────────────────────────────────────────────
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type '{ext}' not allowed.",
-        )
+        raise HTTPException(status_code=400, detail=f"File type '{ext}' not allowed.")
 
-    # Save temporarily
-    temp_id = str(uuid.uuid4())
-    temp_path = UPLOADS_DIR / f"_temp_{temp_id}{ext}"
+    file_bytes = await file.read()
+    filesize = len(file_bytes)
+
+    if filesize > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large. Max: {MAX_FILE_SIZE // (1024*1024)}MB")
+    if filesize == 0:
+        raise HTTPException(status_code=400, detail="Empty file")
 
     try:
-        file_bytes = await file.read()
-        with open(temp_path, "wb") as f:
-            f.write(file_bytes)
+        parsed_tags = json.loads(tags)
+        if not isinstance(parsed_tags, list):
+            raise ValueError
+        tags = json.dumps(parsed_tags)
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(status_code=400, detail="Tags must be a valid JSON array")
 
-        if not can_extract(str(temp_path)):
-            raise HTTPException(
-                status_code=400,
-                detail=f"File type '{ext}' not supported for text extraction.",
-            )
+    # ── Save file ─────────────────────────────────────────────────
+    content_id = str(uuid.uuid4())
+    safe_filename = f"{content_id}{ext}"
+    filepath = UPLOADS_DIR / safe_filename
 
-        extracted = extract_from_file(str(temp_path))
+    with open(filepath, "wb") as f:
+        f.write(file_bytes)
 
-        return ExtractionResponse(
-            id=temp_id,
-            filename=file.filename,
-            extracted_text=extracted,
-            message="Quick extraction complete (file not stored)",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Extraction failed: {str(e)}",
-        )
-    finally:
-        # Always clean up temp file
-        if temp_path.exists():
-            os.remove(temp_path)
+    now = datetime.now(timezone.utc).isoformat()
+    data = {
+        "id": content_id,
+        "filename": file.filename,
+        "filepath": str(filepath),
+        "mimetype": file.content_type or "application/octet-stream",
+        "filesize": filesize,
+        "class_name": class_name.strip(),
+        "subject": subject.strip(),
+        "chapter": chapter.strip(),
+        "description": description.strip(),
+        "tags": tags,
+        "created_at": now,
+        "updated_at": now,
+    }
+    insert_content(data)
+
+    # ── If not extractable, return immediately ────────────────────
+    if not can_extract(str(filepath)):
+        import json as _json
+
+        async def _no_extract():
+            yield f"data: {_json.dumps({'percent': 100, 'message': 'File saved (not extractable)', 'status': 'completed', 'content_id': content_id, 'extracted_text': ''})}\n\n"
+
+        return StreamingResponse(_no_extract(), media_type="text/event-stream")
+
+    # ── Stream extraction progress via SSE ────────────────────────
+    progress_q: queue.Queue = queue.Queue()
+
+    def _extract_thread():
+        """Run extraction in a thread, push progress events to the queue."""
+        import json as _json
+        try:
+            def on_progress(pct: int, msg: str):
+                progress_q.put({"percent": pct, "message": msg, "status": "processing"})
+
+            extracted = extract_from_file(str(filepath), mode="full", progress_cb=on_progress)
+            update_extracted_text(content_id, extracted)
+            progress_q.put({
+                "percent": 100,
+                "message": "Extraction complete",
+                "status": "completed",
+                "content_id": content_id,
+                "extracted_text": extracted,
+            })
+        except Exception as e:
+            progress_q.put({"percent": 0, "message": f"Failed: {str(e)}", "status": "failed"})
+
+    thread = threading.Thread(target=_extract_thread, daemon=True)
+    thread.start()
+
+    async def _event_stream():
+        import json as _json
+        import asyncio
+        while True:
+            try:
+                event = progress_q.get(timeout=0.5)
+            except queue.Empty:
+                # Send keep-alive comment so connection doesn't drop
+                yield ": keepalive\n\n"
+                continue
+
+            yield f"data: {_json.dumps(event)}\n\n"
+
+            if event.get("status") in ("completed", "failed"):
+                break
+
+    return StreamingResponse(_event_stream(), media_type="text/event-stream")
+
+
+
 
 
 @router.get("", response_model=ContentListResponse)
@@ -190,6 +293,35 @@ async def get_content(content_id: str):
     if not record:
         raise HTTPException(status_code=404, detail="Content not found")
     return ContentResponse(**record)
+
+
+@router.get("/{content_id}/progress", tags=["Extraction"])
+async def get_extraction_progress(content_id: str):
+    """Get real-time extraction progress for a content item.
+
+    Returns:
+        - **percent**: 0–100 (integer)
+        - **status**: "processing", "completed", or "failed"
+        - **message**: Human-readable status, e.g. "Extracting page 3/7..."
+
+    If extraction hasn't started or the ID is unknown, checks the DB:
+    if extracted_text already exists, returns 100%.
+    """
+    with _progress_lock:
+        progress = _progress.get(content_id)
+
+    if progress:
+        return progress
+
+    # Fallback: check if extraction already finished (progress dict cleared or missed)
+    record = get_content_by_id(content_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Content not found")
+
+    if record.get("extracted_text"):
+        return {"percent": 100, "message": "Extraction complete", "status": "completed"}
+
+    return {"percent": 0, "message": "Extraction not started", "status": "pending"}
 
 
 @router.get("/{content_id}/download")
@@ -229,12 +361,18 @@ async def delete_content(content_id: str):
 
 
 def _run_extraction_background(content_id: str, filepath: str, mode: str):
-    """Background task: run extraction and save to DB."""
+    """Background task: run extraction and save to DB with progress tracking."""
+    def on_progress(pct: int, msg: str):
+        _update_progress(content_id, pct, msg)
+
     try:
-        extracted = extract_from_file(filepath, mode=mode)
+        _update_progress(content_id, 0, "Starting extraction...")
+        extracted = extract_from_file(filepath, mode=mode, progress_cb=on_progress)
         update_extracted_text(content_id, extracted)
+        _update_progress(content_id, 100, "Extraction complete")
         print(f"Background extraction done for {content_id}")
     except Exception as e:
+        _update_progress(content_id, -1, f"Failed: {str(e)}")
         print(f"Background extraction failed for {content_id}: {e}")
 
 
