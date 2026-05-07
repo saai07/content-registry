@@ -3,18 +3,25 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()  # loads .env in dev; env vars set in HF Space settings take precedence
+
 
 # Base directory (project root)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Upload directory
-UPLOADS_DIR = BASE_DIR / "uploads"
-UPLOADS_DIR.mkdir(exist_ok=True)
+# Upload directory — overridden by UPLOADS_DIR env var in production
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(BASE_DIR / "uploads")))
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Database
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
-DATABASE_PATH = DATA_DIR / "content_registry.db"
+# Database — overridden by DATABASE_PATH env var in production
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(BASE_DIR / "data" / "content_registry.db")))
+DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# Public base URL — used to rewrite extracted image paths to full URLs.
+# In production: set to your HF Spaces URL, e.g. https://username-content-registry.hf.space
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
 
 # Upload limits
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB

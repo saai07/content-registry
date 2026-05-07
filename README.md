@@ -1,3 +1,13 @@
+---
+title: Content Registry
+emoji: 📚
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Content Registry
 
 A FastAPI microservice for uploading and classifying educational content.

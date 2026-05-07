@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 from pix2text import Pix2Text
 
-from app.config import UPLOADS_DIR
+from app.config import BASE_URL, UPLOADS_DIR
 
 # Directory to save extracted image assets (diagrams, figures) permanently
 ASSETS_DIR = UPLOADS_DIR / "extracted_assets"
@@ -17,6 +17,24 @@ _p2t_instance: Pix2Text | None = None
 
 # Max image dimension — downscale larger images for speed
 MAX_IMAGE_DIM = 1500
+
+
+def _rewrite_paths_to_urls(text: str) -> str:
+    """Replace local filesystem paths in extracted markdown with public URLs.
+
+    pix2text saves extracted figures to UPLOADS_DIR/extracted_assets/...
+    Those paths are only valid on the server. This function rewrites them
+    to full public URLs so external clients (e.g. AuraDocs RAG app) can
+    load the images.
+
+    Example:
+        /app/uploads/extracted_assets/abc/fig.png
+        → https://your-space.hf.space/uploads/extracted_assets/abc/fig.png
+    """
+    # Normalise to forward slashes (handles Windows dev paths too)
+    local_prefix = str(UPLOADS_DIR).replace("\\", "/")
+    normalised   = text.replace("\\", "/")
+    return normalised.replace(local_prefix, f"{BASE_URL}/uploads")
 
 
 def _get_p2t() -> Pix2Text:
@@ -119,7 +137,7 @@ def extract_from_file(filepath: str, mode: str = "fast") -> str:
 
     if ext in EXTRACTABLE_PDF_EXTS:
         result = p2t.recognize_pdf(str(path))
-        return _result_to_text(result)
+        return _rewrite_paths_to_urls(_result_to_text(result))
 
     # For images — optionally downscale
     process_path = _downscale_image(str(path))
@@ -128,11 +146,11 @@ def extract_from_file(filepath: str, mode: str = "fast") -> str:
         if mode == "fast":
             # Fast mode: recognize() — no layout detection, much faster
             result = p2t.recognize(process_path)
-            return _result_to_text(result)
+            return _rewrite_paths_to_urls(_result_to_text(result))
         else:
             # Full mode: recognize_page() — full layout analysis
             result = p2t.recognize_page(process_path)
-            return _result_to_text(result)
+            return _rewrite_paths_to_urls(_result_to_text(result))
     finally:
         # Clean up resized temp file
         if process_path != str(path) and Path(process_path).exists():
