@@ -1,5 +1,8 @@
 """Content Registry - Pix2Text extraction service with progress tracking."""
 
+import base64
+import io
+import re
 import uuid
 from pathlib import Path
 from typing import Callable, Optional
@@ -22,6 +25,87 @@ _p2t_instance: Pix2Text | None = None
 
 # Max image dimension — downscale larger images for speed
 MAX_IMAGE_DIM = 1500
+
+# Regex to find markdown image references: ![alt](path)
+_IMG_PATTERN = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
+
+# MIME types for base64 encoding
+_MIME_MAP = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+}
+
+
+def _embed_images_as_base64(markdown_text: str, base_dir: str | Path) -> str:
+    """Replace image file references in markdown with base64 data URIs.
+
+    Finds all ``![alt](path)`` patterns, reads the image file from disk,
+    optionally resizes it (if > MAX_IMAGE_DIM), encodes it as a base64
+    data URI, and replaces the path in-place.
+
+    If an image file doesn't exist or can't be read, the original
+    reference is left untouched (no crash).
+
+    Args:
+        markdown_text: Extracted markdown containing image references.
+        base_dir: Directory that relative image paths are resolved against.
+
+    Returns:
+        Markdown with image paths replaced by ``data:image/...;base64,...`` URIs.
+    """
+    base_dir = Path(base_dir)
+
+    def _replace_match(match: re.Match) -> str:
+        alt_text = match.group(1)
+        img_path_str = match.group(2)
+
+        # Skip if already a URL or data URI
+        if img_path_str.startswith(("http://", "https://", "data:")):
+            return match.group(0)
+
+        # Resolve relative path against base_dir
+        img_path = Path(img_path_str)
+        if not img_path.is_absolute():
+            img_path = base_dir / img_path
+
+        if not img_path.exists():
+            print(f"  [base64] Image not found, skipping: {img_path}")
+            return match.group(0)
+
+        try:
+            img = Image.open(img_path)
+
+            # Resize if too large
+            w, h = img.size
+            if max(w, h) > MAX_IMAGE_DIM:
+                ratio = MAX_IMAGE_DIM / max(w, h)
+                img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+
+            # Determine format and MIME type
+            suffix = img_path.suffix.lower()
+            mime = _MIME_MAP.get(suffix, "image/png")
+            save_format = "JPEG" if "jpeg" in mime else suffix.lstrip(".").upper()
+            if save_format == "JPG":
+                save_format = "JPEG"
+
+            # Encode to base64
+            buffer = io.BytesIO()
+            img.save(buffer, format=save_format)
+            b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
+
+            data_uri = f"data:{mime};base64,{b64}"
+            print(f"  [base64] Embedded {img_path.name} ({w}x{h} → {img.size[0]}x{img.size[1]}, {len(b64)//1024}KB)")
+            return f"![{alt_text}]({data_uri})"
+
+        except Exception as e:
+            print(f"  [base64] Failed to encode {img_path}: {e}")
+            return match.group(0)
+
+    return _IMG_PATTERN.sub(_replace_match, markdown_text)
 
 
 def _rewrite_paths_to_urls(text: str) -> str:
@@ -100,7 +184,10 @@ def _result_to_text(result) -> str:
         try:
             out_dir = ASSETS_DIR / uuid.uuid4().hex
             out_dir.mkdir(parents=True, exist_ok=True)
-            return result.to_markdown(str(out_dir))
+            md = result.to_markdown(str(out_dir))
+            # Embed images as base64 immediately while files are still on disk
+            md = _embed_images_as_base64(md, out_dir)
+            return md
         except Exception:
             pass
 
@@ -168,8 +255,10 @@ def _extract_pdf_with_progress(
     combined = "\n\n---\n\n".join(page_results)
 
     if progress_cb:
-        progress_cb(95, "Rewriting image paths...")
+        progress_cb(95, "Embedding images as base64...")
 
+    # Base64 embedding is already done per-page in _result_to_text,
+    # but run _rewrite_paths_to_urls as fallback for any missed paths
     return _rewrite_paths_to_urls(combined)
 
 
@@ -236,8 +325,10 @@ def extract_from_file(
         text = _result_to_text(result)
 
         if progress_cb:
-            progress_cb(95, "Rewriting image paths...")
+            progress_cb(95, "Embedding images as base64...")
 
+        # Base64 embedding is already done in _result_to_text,
+        # _rewrite_paths_to_urls catches any remaining file paths as fallback
         return _rewrite_paths_to_urls(text)
     finally:
         # Clean up resized temp file
