@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import MAX_FILE_SIZE, UPLOADS_DIR
+from app.config import BASE_DIR, MAX_FILE_SIZE, UPLOADS_DIR
 from app.database import init_db
 from app.routers import content, metadata
 
@@ -70,24 +70,12 @@ app.include_router(metadata.router)
 # Serve uploaded files as static (for download links in extracted markdown)
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
-
-# ---------------------------------------------------------------------------
-# Core routes
-# ---------------------------------------------------------------------------
-
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check for load balancers and container orchestrators."""
     return {"status": "ok", "service": "content-registry"}
 
+# Serve frontend static assets (HTML, CSS, JS) at the root
+app.mount("/", StaticFiles(directory=str(BASE_DIR / "frontend"), html=True), name="frontend")
 
-@app.get("/", tags=["Health"])
-async def root():
-    """Service info / root endpoint."""
-    return {
-        "service": "Content Registry",
-        "version": "0.1.0",
-        "status": "running",
-        "docs": "/docs",
-        "health": "/health",
-    }
+

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Registry — Educational Resource Center</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="/style.css">
+  <!-- Markdown & MathJax support -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        ignoreHtmlClass: 'tex2jax_ignore',
+        processHtmlClass: 'tex2jax_process'
+      },
+      startup: {
+        typeset: false
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+</head>
+
+<body>
+
+  <!-- Dashboard Container -->
+  <div class="app-container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-icon">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <h2>EduRegistry</h2>
+      </div>
+      <nav class="nav-menu">
+        <a href="#" class="nav-item active" data-tab="dashboard">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="upload">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload Content</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="explore">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>Explore Files</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <p>Content Registry v0.1.0</p>
+        <span class="status-badge"><span class="dot"></span> Online</span>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- Top Navbar -->
+      <header class="topbar">
+        <div class="page-title">
+          <h1 id="view-title">Dashboard</h1>
+          <p id="view-subtitle">Overview of your educational resource repository</p>
+        </div>
+        <div class="user-profile">
+          <i class="fa-regular fa-bell notification-icon"></i>
+          <div class="divider"></div>
+          <span class="user-name">Curator Space</span>
+          <div class="avatar"><i class="fa-solid fa-user-tie"></i></div>
+        </div>
+      </header>
+
+      <!-- View Sections -->
+      <div class="content-body">
+
+        <!-- SECTION: DASHBOARD -->
+        <section id="dashboard-view" class="view-section active">
+          <!-- Stats Summary Grid -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon purple">
+                <i class="fa-solid fa-file-invoice"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Total Documents</h3>
+                <p class="stat-value" id="stat-total-docs">0</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue">
+                <i class="fa-solid fa-language"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Classes Represented</h3>
+                <p class="stat-value" id="stat-total-classes">0</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon green">
+                <i class="fa-solid fa-book-open"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Subjects Tagged</h3>
+                <p class="stat-value" id="stat-total-subjects">0</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions / Recents -->
+          <div class="dashboard-layouts">
+            <div class="dashboard-panel main-panel">
+              <div class="panel-header">
+                <h2>Recently Uploaded Resources</h2>
+                <button class="btn btn-secondary btn-sm" id="btn-view-all-dashboard">
+                  View All <i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+              <div class="recent-list-container">
+                <div class="recent-list" id="dashboard-recent-list">
+                  <!-- JS Dynamic Content -->
+                  <div class="empty-state">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <p>Loading recent uploads...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-panel side-panel">
+              <div class="panel-header">
+                <h2>Quick Actions</h2>
+              </div>
+              <div class="quick-actions-list">
+                <button class="action-card" id="qa-upload">
+                  <div class="action-icon"><i class="fa-solid fa-upload"></i></div>
+                  <div class="action-desc">
+                    <h3>Upload New Resource</h3>
+                    <p>Add PDF, doc, image with OCR classification</p>
+                  </div>
+                </button>
+                <button class="action-card" id="qa-browse">
+                  <div class="action-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+                  <div class="action-desc">
+                    <h3>Search Registry</h3>
+                    <p>Filter by Class, Subject, and Chapter</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION: UPLOAD CONTENT -->
+        <section id="upload-view" class="view-section">
+          <div class="upload-container">
+            <div class="upload-form-card">
+              <h2>Resource Intake Portal</h2>
+              <p class="subtitle">Upload files and automatically parse layout, text, and LaTeX equations</p>
+
+              <form id="upload-form" class="resource-form">
+                <!-- Drag and Drop Zone -->
+                <div class="drop-zone" id="drop-zone">
+                  <input type="file" id="file-input" required hidden>
+                  <div class="drop-zone-content">
+                    <i class="fa-solid fa-cloud-arrow-up cloud-icon"></i>
+                    <h3>Drag & Drop file here</h3>
+                    <p>or <span>browse your computer</span></p>
+                    <p class="file-limits">PDF, DOCX, PNG, JPG, WEBP (Max 50MB)</p>
+                  </div>
+                  <div class="selected-file-banner" id="file-banner" style="display:none;">
+                    <i class="fa-regular fa-file-pdf file-type-icon"></i>
+                    <div class="file-metadata">
+                      <span class="selected-filename">sample.pdf</span>
+                      <span class="selected-filesize">2.4 MB</span>
+                    </div>
+                    <button type="button" class="btn-remove-file" id="btn-remove-file">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Classification Fields -->
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="class-select">Target Class *</label>
+                    <div class="select-wrapper">
+                      <select id="class-select" required>
+                        <option value="" disabled selected>Select class...</option>
+                        <!-- Dynamic options -->
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="subject-select">Subject *</label>
+                    <div class="select-wrapper">
+                      <select id="subject-select" required>
+                        <option value="" disabled selected>Select subject...</option>
+                        <!-- Dynamic options -->
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="chapter-select">Chapter *</label>
+                  <div class="select-wrapper">
+                    <select id="chapter-select" required>
+                      <option value="" disabled selected>Select chapter...</option>
+                      <!-- Dynamic options -->
+                    </select>
+                  </div>
+                  <div class="chapter-custom-input-container" style="display:none;" id="chapter-custom-container">
+                    <input type="text" id="chapter-custom-input" placeholder="Type custom chapter name...">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="doc-description">Short Description / Notes</label>
+                  <textarea id="doc-description" rows="3"
+                    placeholder="Briefly describe the educational material..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label for="doc-tags">Tags (Comma Separated)</label>
+                  <input type="text" id="doc-tags" placeholder="e.g. revision, sample-paper, formula-sheet">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" id="btn-submit-upload">
+                  <i class="fa-solid fa-bolt"></i> Upload & Process (SSE)
+                </button>
+              </form>
+            </div>
+
+            <!-- SSE Live Extraction Progress Side Panel -->
+            <div class="progress-panel-card" id="sse-progress-card">
+              <div class="progress-panel-header">
+                <h3>Extraction Console</h3>
+                <span class="console-badge idle" id="console-status-badge">Idle</span>
+              </div>
+              <div class="progress-panel-body">
+                <div class="progress-bar-container">
+                  <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="sse-progress-fill" style="width: 0%;"></div>
+                  </div>
+                  <span class="progress-percentage" id="sse-progress-percent">0%</span>
+                </div>
+                <p class="progress-description" id="sse-progress-message">Awaiting upload...</p>
+
+                <div class="console-logs-wrapper">
+                  <div class="console-logs" id="sse-logs">
+                    <div class="log-line system">[SYSTEM] Ready for next extraction operation.</div>
+                  </div>
+                </div>
+
+                <div class="console-actions" id="console-actions" style="display: none; margin-top: 16px;">
+                  <button type="button" class="btn btn-primary btn-block" id="btn-view-extracted">
+                    <i class="fa-solid fa-file-lines"></i> View Extracted Content
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION: EXPLORE FILES -->
+        <section id="explore-view" class="view-section">
+          <!-- Filters & Search Bar -->
+          <div class="filters-card">
+            <div class="search-input-wrapper">
+              <i class="fa-solid fa-magnifying-glass search-icon"></i>
+              <input type="text" id="search-query" placeholder="Search filenames, descriptions, chapters...">
+            </div>
+
+            <div class="filters-row">
+              <div class="filter-group">
+                <label>Class</label>
+                <select id="filter-class">
+                  <option value="">All Classes</option>
+                  <!-- Dynamic -->
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label>Subject</label>
+                <select id="filter-subject">
+                  <option value="">All Subjects</option>
+                  <!-- Dynamic -->
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label>Chapter</label>
+                <select id="filter-chapter">
+                  <option value="">All Chapters</option>
+                  <!-- Dynamic -->
+                </select>
+              </div>
+
+              <button class="btn btn-secondary btn-icon" id="btn-reset-filters" title="Reset Filters">
+                <i class="fa-solid fa-arrow-rotate-left"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Files Grid -->
+          <div class="files-grid-container">
+            <div class="grid-header">
+              <h2>Registered Content (<span id="results-count">0</span>)</h2>
+              <div class="layout-actions">
+                <button class="layout-btn active" id="layout-grid" title="Grid View"><i
+                    class="fa-solid fa-grip"></i></button>
+                <button class="layout-btn" id="layout-list" title="List View"><i class="fa-solid fa-list"></i></button>
+              </div>
+            </div>
+
+            <div class="files-grid" id="files-grid">
+              <!-- JS Loaded File Cards -->
+              <div class="empty-state">
+                <i class="fa-solid fa-folder-open"></i>
+                <h3>No files found</h3>
+                <p>Try refining your search filters or upload a new resource</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- SLIDING DETAIL DRAWER -->
+    <div class="detail-drawer-overlay" id="drawer-overlay"></div>
+    <div class="detail-drawer" id="detail-drawer">
+      <div class="drawer-header">
+        <button class="btn-close-drawer" id="btn-close-drawer">
+          <i class="fa-solid fa-arrow-left"></i> Back
+        </button>
+        <div class="drawer-actions">
+          <a href="#" target="_blank" class="btn btn-secondary btn-sm" id="drawer-btn-download">
+            <i class="fa-solid fa-download"></i> Download
+          </a>
+          <button class="btn btn-danger btn-sm" id="drawer-btn-delete">
+            <i class="fa-solid fa-trash-can"></i> Delete
+          </button>
+        </div>
+      </div>
+
+      <div class="drawer-body">
+        <div class="drawer-meta-section">
+          <span class="doc-badge primary" id="drawer-class">Class 10</span>
+          <span class="doc-badge secondary" id="drawer-subject">Mathematics</span>
+          <h2 id="drawer-filename">quadratic_equations.pdf</h2>
+          <p class="drawer-chapter-info"><i class="fa-solid fa-book-bookmark"></i> <span id="drawer-chapter">Chapter
+              4</span></p>
+          <p class="drawer-description" id="drawer-description">Details about the resource...</p>
+          <div class="drawer-tags-container" id="drawer-tags">
+            <!-- Badges -->
+          </div>
+          <div class="drawer-specs">
+            <span><i class="fa-solid fa-clock"></i> Uploaded: <strong id="drawer-date">-</strong></span>
+            <span><i class="fa-solid fa-hard-drive"></i> Size: <strong id="drawer-size">-</strong></span>
+          </div>
+        </div>
+
+        <div class="drawer-tabs">
+          <button class="drawer-tab active" data-pane="preview-pane">Extracted Document</button>
+          <button class="drawer-tab" data-pane="raw-pane">Raw Markdown</button>
+        </div>
+
+        <div class="drawer-tab-content">
+          <!-- PANE: RENDERED PREVIEW -->
+          <div class="tab-pane active" id="preview-pane">
+            <div class="document-rendering-container">
+              <!-- If not extracted yet, show extraction option -->
+              <div class="not-extracted-state" id="not-extracted-block" style="display:none;">
+                <i class="fa-solid fa-wand-magic-sparkles magic-icon"></i>
+                <h3>Content Not Yet Extracted</h3>
+                <p>This file has not gone through Layout Analysis and OCR extraction yet.</p>
+                <div class="extraction-mode-select">
+                  <label><input type="radio" name="extract-mode" value="fast" checked> Fast Mode (No layout, 3-5x
+                    faster)</label>
+                  <label><input type="radio" name="extract-mode" value="full"> Full Mode (Full page layout and
+                    equations)</label>
+                </div>
+                <button class="btn btn-primary" id="btn-trigger-extraction">
+                  <i class="fa-solid fa-play"></i> Run Extraction Now
+                </button>
+              </div>
+
+              <!-- Rendered output -->
+              <div class="markdown-preview tex2jax_process" id="drawer-rendered-md"></div>
+            </div>
+          </div>
+
+          <!-- PANE: RAW MARKDOWN -->
+          <div class="tab-pane" id="raw-pane">
+            <textarea class="raw-markdown-textarea" id="drawer-raw-md" readonly></textarea>
+            <button class="btn btn-secondary btn-sm copy-btn" id="btn-copy-raw">
+              <i class="fa-regular fa-copy"></i> Copy Markdown
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>

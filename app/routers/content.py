@@ -473,22 +473,22 @@ MathJax = {{ tex: {{ inlineMath: [['$','$']], displayMath: [['$$','$$']] }}, sta
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',sans-serif;background:#0f1117;color:#e2e8f0;padding:0}}
-header{{background:#1a1d2e;border-bottom:1px solid #2d3154;padding:20px 40px}}
-header h1{{font-size:18px;font-weight:700;color:#c7d2fe}}
-header p{{font-size:12px;color:#64748b;margin-top:4px}}
+body{{font-family:'Inter',sans-serif;background:#000000;color:#e2e8f0;padding:0}}
+header{{background:#080808;border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px}}
+header h1{{font-size:18px;font-weight:700;color:#ffffff}}
+header p{{font-size:12px;color:#94a3b8;margin-top:4px}}
 .badge{{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#1e3a5f;color:#60a5fa;margin-top:8px;margin-right:6px}}
 main{{max-width:800px;margin:40px auto;padding:0 40px 80px;line-height:1.9}}
-main h1,main h2,main h3{{color:#c7d2fe;margin:28px 0 12px;font-weight:600}}
-main h1{{font-size:28px;border-bottom:1px solid #2d3154;padding-bottom:10px}}
+main h1,main h2,main h3{{color:#ffffff;margin:28px 0 12px;font-weight:600}}
+main h1{{font-size:28px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:10px}}
 main h2{{font-size:22px}}
 main p{{color:#cbd5e1;margin:12px 0;font-size:15px}}
-main img{{max-width:100%;border-radius:10px;margin:20px 0;border:1px solid #2d3154;display:block}}
+main img{{max-width:100%;border-radius:10px;margin:20px 0;border:1px solid rgba(255,255,255,0.08);display:block}}
 main table{{width:100%;border-collapse:collapse;margin:16px 0}}
-main th{{background:#1e293b;padding:10px 14px;color:#c7d2fe;text-align:left}}
-main td{{padding:10px 14px;border-bottom:1px solid #1e293b;color:#cbd5e1}}
-main code{{background:#1e293b;padding:2px 6px;border-radius:4px;font-size:13px;color:#a5f3fc}}
-main pre{{background:#1e293b;padding:16px;border-radius:10px;overflow-x:auto;margin:16px 0}}
+main th{{background:#121212;padding:10px 14px;color:#ffffff;text-align:left}}
+main td{{padding:10px 14px;border-bottom:1px solid #121212;color:#cbd5e1}}
+main code{{background:#121212;padding:2px 6px;border-radius:4px;font-size:13px;color:#a5f3fc}}
+main pre{{background:#121212;padding:16px;border-radius:10px;overflow-x:auto;margin:16px 0;border:1px solid rgba(255,255,255,0.08)}}
 main blockquote{{border-left:3px solid #818cf8;padding-left:16px;color:#94a3b8;margin:16px 0}}
 .back-link{{display:inline-block;margin:20px 0 0 40px;color:#818cf8;text-decoration:none;font-size:13px}}
 .back-link:hover{{text-decoration:underline}}
